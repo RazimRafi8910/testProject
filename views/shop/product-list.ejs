@@ -1,0 +1,122 @@
+<%- include('../partials/header.ejs') %>
+<%- include('../partials/user-navbar.ejs') %>
+
+
+
+<div class="container mt-4">
+    <% if (message.error) { %>
+        <div class="alert alert-danger" role="alert">
+            <%= message.error %>
+        </div>
+    <% } %>
+
+    <div class="row mt-5">
+        <div class="d-flex justify-content-between">
+          <h1 class="fw-bold subheading">Products</h1>
+          
+          <div class="dropdown">
+            <a class="btn btn-outline-dark dropdown-toggle py-2 mx-3 px-5" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
+                Sort
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+                <li><a class="dropdown-item" href="#">Price</a></li>
+            </ul>
+        </div>
+
+      </div>
+      <hr class="my-3">
+  </div>
+
+    <div class="row">
+        <form class="d-flex col-xl-7 col-lg-5 col-12 mt-2 mb-3" action="/products/search">
+            <input class="form-control py-2 border border-secondary" type="search" name="productName" placeholder="Search" aria-label="Search">
+            <button class="btn btn-dark px-4" type="submit">Search</button>
+        </form>
+
+        <div class="col-xl-5 col-lg-5 col-12 mt-2 mb-3">
+            <div class="d-flex justify-content-center">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary dropdown-toggle btn-lg py-2 mx-3 px-5" data-bs-toggle="dropdown" aria-expanded="false">
+                        Categories
+                    </button>
+                    <ul class="dropdown-menu px-5">
+                        <% categorys.forEach(function (category) { %>
+                            <li><a class="dropdown-item" href="#"><%= category.categoryName %></a></li>
+                        <% }) %>
+                    </ul>
+                </div>
+
+                <button type="button" class="btn btn-outline-secondary btn-lg py-2 mx-3 px-5" data-bs-toggle="dropdown" aria-expanded="false">
+                  Filter
+              </button>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row">
+        <% products.forEach(function (product) { %>
+            <div class="col-lg-3 col-md-6 col-sm-12 d-flex justify-content-center">
+                <div class="card my-2 w-100 shadow-2-strong" style="width: 18rem;" >
+                  <a href="/product/<%= product._id %>/view" class="text-decoration-none text-dark">
+                    <img src="<%= product.images[0] %>" style="height: 16rem;" class="card-img-top" alt="product image">
+                    <div class="card-body d-flex flex-column">
+                      <h5 class="card-title fw-bold"><%= product.productName %></h5>
+                      <p class="card-text">Rs <%= product.price %></p>
+                      
+                    </a>
+                      <div class="d-flex align-items-end pt-1 px-0 pb-0 mt-auto">
+                        <button type="button" onclick="addToCart('<%= product._id %>')" class="btn btn-dark shadow-0 me-1">Add to cart</button>
+                        <a href="" class="btn btn-light border px-2 pt-2 icon-hover">
+                          <i class="fas fa-heart fa-lg text-secondary px-1"></i>
+                        </a>
+                      </div>
+                      <% if(product.stock==0) {%>
+                        <p class="card-text text-danger mx-2 mt-2"><small>Out of stock</small></p>
+                        <% } else { %>
+                        <p class="card-text mx-2 mt-2"><small>Available <%= product.stock %></small></p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        <% }) %>
+      </div>
+</div>
+
+
+<section class="mt-4">
+  <nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+        <% %>
+      <li class="page-item disabled">
+        <a class="page-link">Previous</a>
+      </li>
+      <li class="page-item"><a class="page-link" href="/products?page=1">1</a></li>
+      <li class="page-item"><a class="page-link" href="/products?page=2">2</a></li>
+      <li class="page-item"><a class="page-link" href="/products?page=3">3</a></li>
+      <li class="page-item">
+        <a class="page-link" href="/products?page=<%=  %>">Next</a>
+      </li>
+    </ul>
+  </nav>
+</section>
+  
+<%- include('../partials/footer.ejs') %>
+
+<script>
+    async function addToCart(productId){
+  try {
+    await fetch(`/cart/${productId}/add`,{
+      method:'POST',
+      credentials: 'include',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+  });
+     window.location.reload();
+  } catch (error) {
+    console.log(error);
+  }
+}
+</script>
