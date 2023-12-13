@@ -31,6 +31,7 @@ router.delete('/cart/:product_id/delete', authenticateUser, userController.cartI
 //order
 router.get('/order/:order_id', authenticateUser, userController.orderPage);
 router.post('/order/:cart_id/create', authenticateUser, userController.createOrder);
+router.delete('/order/:cart_id/delete', authenticateUser, userController.createOrder);
 
 //profile
 router.get('/profile',isUserBlocked, authenticateUser, userController.userProfile);

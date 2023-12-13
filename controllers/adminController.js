@@ -5,9 +5,58 @@ const fs = require("fs");
 const Order = require("../models/order");
 
 module.exports = {
+
   //Admin Dashboard
-  adminDashboard: (req, res) => {
-    res.render("admin/dashboard", { tittle: "GadgetStore | Dashboard" });
+  adminDashboard: async (req, res, next) => {
+    try {
+      let orders = await Order.find().populate('items.product');
+      let users = await User.find();
+      let products = await Product.find();
+      let categorys = await Category.find();
+
+      let confirmedOrder = 0;
+      let deliveredOrder = 0;
+      let shippingOrder = 0;
+      let itemsSold = 0;
+      let totalIncome = 0
+      orders.forEach(order => {
+        totalIncome += order.totalPrice;
+        if (order.orderStatus === 'Confrimed') {
+          confirmedOrder++;
+        }
+        if (order.orderStatus === 'Delivered') {
+          deliveredOrder++;
+        }
+        if (order.orderStatus === 'Shipping') {
+          shippingOrder++;
+        }
+        order.items.forEach(item => {
+          itemsSold += item.quantity;
+        })
+      });
+
+
+      let totalStock = 0;
+      products.forEach(product => {
+        totalStock += product.stock;
+      });
+
+    res.render("admin/dashboard", {
+      tittle: "GadgetStore | Dashboard",
+      orders,
+      users,
+      products,
+      categorys,
+      totalStock,
+      confirmedOrder,
+      deliveredOrder,
+      shippingOrder,
+      itemsSold,
+      totalIncome
+    });
+    } catch (error) {
+      next(error);
+    }
   },
 
   //Admin products
@@ -400,5 +449,6 @@ module.exports = {
     } catch (error) {
       next(error);
     }
-  }
+  },
+
 };
