@@ -113,9 +113,48 @@
 
   <div class="row mt-5">
         <div class=" d-flex justify-content-center">
-            <a href="/" class="btn btn-dark py-2 px-5">continue Shoping</a>
+            <button type="button" data-bs-toggle="modal" data-bs-target="#cancelOrder" class="btn btn-danger py-2 px-5">Cancel Order</button>
         </div>
   </div>
 
+<!-----modal for delete addresss---->
+<div class="modal fade" id="cancelOrder" tabindex="-1" aria-labelledby="cancelOrder" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Confrim Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-danger">
+          Are you sure you want to Cancel this Order?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger" onclick="cancelOrder('<%= userOrder._id %>')">Delete</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+</div>
+
     <%- include('../partials/footer.ejs') %>
+
+    <script>
+
+
+      async function cancelOrder(orderId){
+        try {
+          let responce =  await fetch(`/order/${orderId}/cancel`,{
+            method:'DELETE',
+            headers: {
+          'Content-Type': 'application/json',
+          }});
+          console.log(responce)
+          window.location.href = '/'
+        } catch (error) {
+          
+        }
+      }
+
+    </script>

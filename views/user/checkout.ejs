@@ -18,6 +18,13 @@
                   <h5 class="card-title mb-2">Address</h5>
                   <hr class="my-2" />
                   <div class="row mb-3">
+                    <% if(userAddress.length <= 0) { %>
+                      <h5>You dont have address</h5>
+                      <div class="col-lg-4 mb-5 mt-2">
+                        <a href="/address/<%= user._id %>/add" class="btn btn-outline-dark">Add new address</a>
+                    </div>
+                      
+                      <% } else { %>
                     <% userAddress.forEach(function(address){ %>
                     <div class="col-lg-6 mb-3">
                         <!-- Default checked radio -->
@@ -33,7 +40,7 @@
                           </div>
                         </div>
                       </div>    
-                      <% })%>
+                      <% }) }%>
                   </div>
       
                   <h5 class="card-title mb-2">Payment Method</h5>

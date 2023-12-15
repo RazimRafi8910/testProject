@@ -1,0 +1,41 @@
+<%- include('../partials/header.ejs') %>
+    <%- include('../partials/user-navbar.ejs') %>
+
+
+    <div class="container">
+        <div class="row mt-4">
+            <h2 class="mb-0">Add New Address</h2>
+            <hr class="mt-0">
+        </div>
+        <div class="row">
+            <form class="row mb-5 mt-2 g-3" action="/address/<%= user._id %>/add" method="post">
+                <div class="col-md-6">
+                    <div class="form-floating mb-3">
+                      <input type="text" class="form-control" value="<%= user.username %>" id="username" name="username">
+                      <label for="username">User Name</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                      <div class="form-floating mb-3">
+                          <input type="text" class="form-control" value="<%= user.number %>" id="Phone" name="Phone">
+                          <label for="Phone">Phone</label>
+                        </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="floatingInput" name="city">
+                        <label for="floatingInput">City</label>
+                      </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="floatingInput" name="state">
+                        <label for="floatingInput">State</label>
+                      </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <%- include('../partials/footer.ejs') %>

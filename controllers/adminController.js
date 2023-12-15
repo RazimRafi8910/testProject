@@ -62,15 +62,42 @@ module.exports = {
   //Admin products
   adminProducts: async (req, res, next) => {
     try {
-      let products = await Product.find().lean();
+
+      //pagination
+      let page = req.query.page || 1;
+      let limit = 9;
+      let skip = (page - 1) * limit;
+      let endIndex = page * limit;
+
+      //product search
+      let productName = req.query.productName || "";
+      const regex = new RegExp(productName, "i");
+
+      let products = await Product.find({ $and: [{ productName: regex }]}).skip(skip).limit(endIndex).populate('category').lean();
       let categorys = await Category.find().lean();
+
+      //product category search
+      let filterCategory = req.query.category || 'All'
+      
+      if (filterCategory != 'All') {
+        let categoryProduct = [];
+        products.forEach(product => {
+          if (product.category.categoryName == filterCategory) {
+            categoryProduct.push(product)
+          };
+        });
+        products = categoryProduct;
+      };
+
       res.render("admin/products", {
         tittle: "GadgetStore | Admin products",
         message: req.flash(),
         products,
         categorys,
       });
-    } catch (error) {}
+    } catch (error) {
+      next(error);
+    }
   },
 
   adminProductDetails: async (req, res, next) => {
@@ -206,6 +233,7 @@ module.exports = {
       let product = await Product.findOne({ _id: productId });
       let productImage = product.images[imageIndex];
 
+      //update image in db
       let updateQuery = {
         $set: {
           [`images.${imageIndex}`]: `/uploads/${image.filename }`
@@ -214,7 +242,7 @@ module.exports = {
       
       await Product.findOneAndUpdate({ _id: productId }, updateQuery);
 
-      //delete the image from server
+      //delete the old image from server
       fs.unlink(`public${productImage}`, (err, data) => {
         if (err) {
           console.log(err);

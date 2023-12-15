@@ -27,20 +27,41 @@ module.exports = {
 
   userProductsPage: async (req, res, next) => {
     try {
-      let page = req.query.page || 1;
-      let limit = 12;
+      
+      let productName = req.query.productName || "";
+      let filterPrice = req.query.priceFilter || 1000000
+      let filterCategory = req.query.category || 'All'
+      const regex = new RegExp(productName, "i");
 
+      //pagination
+      let page = req.query.page || 1;
+      let limit = 9;
       let skip = (page - 1) * limit;
       let endIndex = page * limit;
+      let products = await Product.find({ $and: [{ productName: regex }, { price: { $lte: filterPrice } }, { isListed: true }] })
+        .skip(skip).limit(endIndex).populate('category');
 
-      let products = await Product.find({ isListed: true }).skip(skip).limit(endIndex).lean();
+      let filteredProducts = products
+      if (filterCategory != 'All') {
+        let categoryProduct = [];
+        products.forEach(product => {
+          if (product.category.categoryName == filterCategory) {
+            categoryProduct.push(product)
+          }
+        })
+        filteredProducts = categoryProduct;
+      } 
+    
+      
       let categorys = await Category.find().lean();
       let user = req.user;
 
       res.render('shop/product-list', {
         tittle: 'GadgetStore | Products',
         message:req.flash(),
-        products,
+        filteredProducts,
+        filterCategory,
+        filterPrice,
         categorys,
         user
       });
@@ -53,6 +74,7 @@ module.exports = {
   productSearch: async (req, res, next) => {
     try {
       let productName = req.query.productName;
+      console.log(req.query);
       const regex = new RegExp(productName, "i");
 
       let products = await Product.find({
@@ -132,6 +154,7 @@ module.exports = {
     }
   },
 
+//user Profile
   userProfile:async (req, res) => {
     try {
       let user = req.user;
@@ -143,6 +166,18 @@ module.exports = {
         userAddress,
         userOrders,
         message: req.flash(),
+      });
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  userProfileEdit: async (req, res, next) => {
+    try {
+      let user = req.user;
+      res.render('user/edit-profile', {
+        tittle: 'GadgetStore | Profile',
+        user,
       });
     } catch (error) {
       next(error)
@@ -265,6 +300,7 @@ module.exports = {
       }
       res.render('user/user-cart', {
         tittle: 'GadgetStore | Cart',
+        message: req.flash(),
         user,
         userCart,
         totalPrice
@@ -276,48 +312,92 @@ module.exports = {
 
   addToCart: async (req, res, next) => {
     try {
-  
       let user = req.user;    
       let productId = req.params.product_id;
       let itemQuantity = req.body.quantity || 1;
       let productQuantity = Number(itemQuantity);
+
       let items = {
         product: productId,
         quantity:productQuantity
       };
+
       let product = await Product.findOne({ _id: productId });
+      //checking the stock of the product
       if (product.stock <= 0 || productQuantity > product.stock) {
         req.flash('error', 'out of stock')
         return res.redirect('/');
       }
       let userCart = await Cart.findOne({ user_id: user._id }).populate('items.product');
 
+      //removing the stock from the product data
       let leftStock = product.stock-productQuantity
       await Product.updateOne({ _id: productId }, { $set: { stock: leftStock } });
+
       if (!userCart) {
+        console.log(userCart);
         await Cart.create({
           user_id:user._id,
           items
-        });
-        
+        }); 
+        console.log('sdf')
         req.flash('message', 'product added to Cart');
         return res.redirect('/cart');
       }
-     //checks item in cart
+
+      
+     //checks if item already exist in cart
       let existItem;
       userCart.items.forEach((item) => {
         if (item.product._id.toString() === productId) {
           existItem = item;
         }
       });
+
       if (!existItem) {
         await Cart.updateOne({ _id: userCart._id }, { $push: { items } });
       } else {
-        let quantity = productQuantity + existItem.quantity;
-        
+        let quantity = productQuantity + existItem.quantity;  
         await Cart.updateOne({ _id: userCart._id, "items.product": productId }, { $set: { "items.$.quantity":quantity } });
       }
+
       res.redirect('/');
+
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  cartItemChangeQuantity: async (req, res, next) => {
+    try {
+      let productId = req.params.product_id;
+      let user = req.user;
+      let cartQuantity = req.body;
+      let product = await Product.findOne({ _id: productId });
+      let userCart = await Cart.findOne({ user_id: user._id });
+      let currentQuantity 
+      let productStock = product.stock;
+
+      userCart.items.forEach(item => {
+        if (productId === item.product.toString()) {
+          currentQuantity = item.quantity
+        }
+      });
+
+      if (cartQuantity.change === 1) {
+        if (productStock === 0) {
+          return req.flash('error', 'Out of Stock');
+        }
+        currentQuantity++;
+        productStock--;
+      }
+      if (cartQuantity.change === -1 && currentQuantity >= 1) {
+        currentQuantity--;
+        productStock++;
+      }
+      await Cart.updateOne({ _id: userCart._id, "items.product": productId }, { $set: { "items.$.quantity": currentQuantity } });
+      await Product.updateOne({ _id: productId }, { $set: { stock: productStock } });
+      res.json('success');
 
     } catch (error) {
       next(error);
@@ -331,12 +411,14 @@ module.exports = {
       let userCart = await Cart.findOne({ user_id: user._id }).populate('items.product');
       let product = await Product.findOne({ _id: productId });
       let productQuantity = 0
+      //checking the product quantity
       userCart.items.forEach((item) => {
         if (item.product._id.toString() === productId) {
           productQuantity = item.quantity;
         }
       });
       
+      //updating stock of removed product
       let currentStock = productQuantity + product.stock;
       
       await Cart.updateOne({ user_id: user._id }, { $pull: { items: { product: productId } } });
@@ -355,9 +437,18 @@ module.exports = {
       let userCart = await Cart.findOne({ _id: cartId }).populate('items.product');
       let userAddress = await Address.find({ user_id: user._id });
       let totalPrice = 0;
+      let quantityCheck = false;
+      //calculating total price of the product
       userCart.items.forEach(item => {
+        if (item.quantity < 1) {
+          quantityCheck = true;
+        }
         totalPrice += item.product.price * item.quantity;
       });
+      if (quantityCheck) {
+        req.flash('error', 'zero quantity on product');
+        return res.redirect('/cart');
+      }
       res.render('user/checkout', {
         tittle: 'GadgetStore | Checkout',
         userAddress,
@@ -394,6 +485,8 @@ module.exports = {
     let orderItems = userCart.items;
     let orderStatus = 'Processing';
     let totalPrice = 0
+
+    //calculating total price
     userCart.items.forEach(item => {
       totalPrice += item.product.price * item.quantity;
     });
@@ -420,4 +513,20 @@ module.exports = {
   }
   },
 
+  cancelOrder: async (req, res, next) => {
+    try {
+      let orderId = req.params.order_id;
+      let order = await Order.findOneAndDelete({ _id: orderId });
+
+      // adding the cancelled items stock to product db
+      order.items.forEach(async (item) => {
+        let product = await Product.findOne({ _id: item.product });
+        let currentStock = product.stock + item.quantity;
+        await Product.updateOne({ _id: item.product }, { $set: { stock: currentStock } });
+      })
+      res.redirect('/')
+    } catch (error) {
+      next(error);
+    }
+  }
 }

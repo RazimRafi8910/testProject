@@ -9,7 +9,7 @@
       <div class="col-lg-2 col-md-3">
         <h6>User Name</h6>
       </div>
-        <div class="col-lg-4 col-md-3">
+        <div class="col-lg-2 col-md-3">
           <h6>Order Id</h6>
         </div>
         <div class="col-lg-2 col-md-3 text-center">
@@ -33,10 +33,10 @@
                 <h5 class="card-title fw-bold text-start"> <%= order.user_id.username %></h5>
               </div>
             </div>
-            <div class="col-lg-4 col-md-3">
+            <div class="col-lg-3 col-md-3">
               <div class="card-body">
                   
-                <h5 class="card-title fw-bold text-start">Id: <%= order._id %></h5>
+                <h5 class="card-title fw-bold text-start"><%= order._id %></h5>
               </div>
             </div>
             <div class="col-lg-2 col-md-3">
@@ -64,10 +64,10 @@
                 <h5 class="card-title">Rs <%= order.totalPrice %></h5>
               </div>
             </div>
-            <div class="col-lg-2 col-md-2 ">
+            <div class="col-lg-1 col-md-2 ">
               <div class="card-body ">
                   
-                <a href="/admin/orders/<%= order._id %>"><button class="btn btn-outline-secondary fw-bold" type="button">Update Order</button></a>
+                <a href="/admin/orders/<%= order._id %>"><button class="btn btn-outline-dark fw-bold" type="button"><i class="fa-solid fa-pen-to-square"></i></button></a>
               </div>
             </div>
           </div>

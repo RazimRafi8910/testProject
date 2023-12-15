@@ -44,7 +44,7 @@
                                 <p class="card-text text-muted fw-bold fs-5"> Accound Status : <%= user.accountStatus %></p>
                             </div>
                         </div>
-                        <a href="" class="btn btn-outline-dark fw-bold px-4 ">Edit</a>
+                        <a href="/profile/edit" class="btn btn-outline-dark fw-bold px-4 ">Edit</a>
                         <a href="/logout" class="btn btn-outline-danger fw-bold px-4 ">Logout</a>
                     </div>
                   </div>
@@ -149,8 +149,18 @@
                       </div>
                       <div class="col-lg-2 col-md-2">
                         <div class="card-body text-center">
+                          <!-- <h5 class="card-title"><%= order.orderStatus %></h5> -->
                             
-                          <h5 class="card-title"><%= order.orderStatus %></h5>
+                          <% if(order.orderStatus === 'Processing'){ %>
+                            <h5 class="card-title text-muted"><%= order.orderStatus %></h5>
+                            <% } else if(order.orderStatus === 'Confrimed') { %>
+                              <h5 class="card-title"><%= order.orderStatus %></h5>
+                              <% } else if(order.orderStatus === 'Shipping') { %>
+                                <h5 class="card-title text-warning"><%= order.orderStatus %></h5>
+                                <% } else {%>
+                                  <h5 class="card-title text-success"><%= order.orderStatus %></h5>
+                                  <% } %> 
+
                         </div>
                       </div>
                       <div class="col-lg-2 col-md-2">
