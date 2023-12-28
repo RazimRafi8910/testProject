@@ -72,6 +72,14 @@
                             <div class="d-flex ">
                                 <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 text-warning fw-bold"><%= order.orderStatus %></p>
                             </div>
+                            <% } else if(order.orderStatus === 'Return Pending') {%>
+                              <div class="d-flex ">
+                                <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 text-danger fw-bold"><%= order.orderStatus %></p>
+                            </div>
+                            <% } else if(order.orderStatus === 'Cancelled') {%>
+                              <div class="d-flex ">
+                                <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 text-danger fw-bold"><%= order.orderStatus %></p>
+                            </div>
                             <% } else {%>
                                 <div class="d-flex ">
                                     <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 text-success fw-bold"><%= order.orderStatus %></p>
@@ -125,13 +133,50 @@
   </div>
 
 <div class="row mt-3 mb-5">
-    <h2 class="mx-1">Order Update</h2>
+    <% if(order.orderStatus === 'Return Accepted') {%>
+      <h2 class="mx-1">Order Update</h2>
     <hr>
-
-    <div class="mx-3 mt-2 d-flex">
-        <h4>Status : </h4>
-        <% if(order.orderStatus === 'Processing'){ %>
-
+      <div class="ms-4 col-md-6">
+        <div class="card border border-dark">
+          <div class="card-header fw-bold text-danger">
+            Return Order
+          </div>
+          <div class="card-body">
+            <h4 class="card-title">Reason</h4>
+            <p class="card-text fs-5"><%= returnDetails.reason %></p>
+            <div class="d-flex justify-content-end">
+              <h5 class="text-success">Accepted</h5>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% } else if(order.orderStatus === 'Return Pending') {%>
+        <h2 class="mx-1">Order Update</h2>
+    <hr>
+        <div class="ms-4 col-md-6">
+        <div class="card">
+          <div class="card-header text-danger">
+            Return Requiest
+          </div>
+          <div class="card-body">
+            <h4 class="card-title">Reason</h4>
+            <p class="card-text fs-5 mb-0"><%= returnDetails.reason %></p>
+            <div>
+              <% if(returnDetails.reason === 'Damaged') {%>
+              <p class="text-muted p-0 m-0">The product will not be added to the stock</p>
+              <% } %>
+            </div>
+            <div class="d-flex justify-content-end">
+              <button type="button" onclick="returnConfirm('<%= order._id %>')" class="btn btn-primary">Accept</button>
+            </div>
+          </div>
+        </div>
+      </div>
+        <%} else { if(order.orderStatus === 'Processing'){ %>
+          <h2 class="mx-1">Order Update</h2>
+    <hr>
+          <div class="mx-3 mt-2 d-flex">
+          <h4>Status : </h4>
             <div class="dropdown dropend ms-2 mb-5">
                 <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
                   Processing
@@ -145,7 +190,10 @@
               </div>
 
             <% } else if(order.orderStatus === 'Confrimed') { %>
-
+              <h2 class="mx-1">Order Update</h2>
+    <hr>
+              <div class="mx-3 mt-2 d-flex">
+                <h4>Status : </h4>
                 <div class="dropdown dropend ms-2 mb-5">
                     <a class="btn btn-dark dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
                       Confrimed
@@ -158,7 +206,10 @@
                   </div>
 
                 <% } else if(order.orderStatus === 'Shipping') { %>
-
+                  <!-- <h2 class="mx-1">Order Update</h2>
+                    <hr> -->
+                  <div class="mx-3 mt-2 d-flex">
+                    <h4>Status : </h4>
                     <div class="dropdown dropend ms-2 mb-5">
                         <a class="btn btn-warning dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
                           Shipping
@@ -171,7 +222,7 @@
 
                     <% } else {%>
 
-                        <div class="dropdown dropend ms-2 mb-5">
+                        <!-- <div class="dropdown dropend ms-2 mb-5">
                             <a class="btn btn-success dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
                               Delivered
                             </a>
@@ -179,9 +230,9 @@
                             <ul class="dropdown-menu " aria-labelledby="dropdownMenuLink">
                               <li><button type="button" onclick="orderStatusConfrim('<%= order._id %>','Processing')" class="dropdown-item text-secondary fw-bold" href="#">Processing</button></li>
                             </ul>
-                          </div>
+                          </div> -->
 
-                        <% } %>
+                        <% } } %>
         
     </div>
 
@@ -192,6 +243,23 @@
 </div>
 </div>
 <script>
+
+async function returnConfirm(orderId){
+  try {
+    let responce = await fetch(`/admin/order/${orderId}/return`,{
+      method:'PUT',
+      headers:{
+        'Content-Type': 'application/json'
+      }
+    });
+    if(responce.ok){
+      window.location.reload();
+    }
+
+  } catch (error) {
+    console.log(error);
+  }
+}
 
 async function orderStatusConfrim(orderId,updateStatus){
     try {

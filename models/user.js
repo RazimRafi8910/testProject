@@ -28,10 +28,21 @@ let userSchema = mongoose.Schema({
     address_id:{
         type: Number,
     },
-    cart_id: {
-        type: Number,
-    }
-})
+    coupons: [{
+        coupon_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref:'coupon'
+        },
+        isUsed: {
+            type: Boolean,
+            required:true
+        },
+        discount: {
+            type: Number,
+            required:true
+        }
+    }]
+});
 
 let User = mongoose.model('user',userSchema)
 

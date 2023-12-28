@@ -9,7 +9,7 @@
       <div class="col-lg-2 col-md-3">
         <h6>User Name</h6>
       </div>
-        <div class="col-lg-2 col-md-3">
+        <div class="col-lg-3 col-md-3">
           <h6>Order Id</h6>
         </div>
         <div class="col-lg-2 col-md-3 text-center">
@@ -21,6 +21,9 @@
         <div class="col-lg-2 col-md-2 text-center">
           <h6>Total price</h6>
         </div>
+        <div class="col-lg-1 col-md-2 text-center">
+          <h6>Update</h6>
+        </div>
       </div>
 
       <% orders.forEach(function(order){ %>
@@ -28,13 +31,13 @@
           <div class="row g-0 d-flex align-items-center px-2">
             
             <div class="col-lg-2 col-md-3">
-              <div class="card-body">
+              <div class="card-body px-2">
                   
                 <h5 class="card-title fw-bold text-start"> <%= order.user_id.username %></h5>
               </div>
             </div>
             <div class="col-lg-3 col-md-3">
-              <div class="card-body">
+              <div class="card-body px-2">
                   
                 <h5 class="card-title fw-bold text-start"><%= order._id %></h5>
               </div>
@@ -53,9 +56,13 @@
                     <h5 class="card-title"><%= order.orderStatus %></h5>
                     <% } else if(order.orderStatus === 'Shipping') { %>
                       <h5 class="card-title text-warning"><%= order.orderStatus %></h5>
-                      <% } else {%>
-                        <h5 class="card-title text-success"><%= order.orderStatus %></h5>
-                        <% } %> 
+                      <% } else if(order.orderStatus === 'Cancelled') {%>
+                        <h5 class="card-title text-danger"><%= order.orderStatus %></h5>
+                        <% } else if(order.orderStatus === 'Return Pending') {%>
+                          <h5 class="card-title text-danger"><%= order.orderStatus %></h5>
+                        <% } else { %> 
+                          <h5 class="card-title text-success"><%= order.orderStatus %></h5>
+                          <% } %> 
               </div>
             </div>
             <div class="col-lg-2 col-md-2">

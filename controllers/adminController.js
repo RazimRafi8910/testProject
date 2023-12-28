@@ -3,13 +3,18 @@ const Category = require("../models/category");
 const User = require("../models/user");
 const fs = require("fs");
 const Order = require("../models/order");
+const { productInputValidation } = require("../config/inputValidation");
+const OrderReturn = require("../models/orderReturn");
+const Wallet = require("../models/wallet");
+const Coupon = require("../models/coupon");
+const uuidv4 = require("../config/uuidGenerator");
 
 module.exports = {
 
   //Admin Dashboard
   adminDashboard: async (req, res, next) => {
     try {
-      let orders = await Order.find().populate('items.product');
+      let orders = await Order.find().populate('items.product').sort({ orderDate: -1 });;
       let users = await User.find();
       let products = await Product.find();
       let categorys = await Category.find();
@@ -71,29 +76,25 @@ module.exports = {
 
       //product search
       let productName = req.query.productName || "";
+      let filterCategory = req.query.category || 'All'
       const regex = new RegExp(productName, "i");
 
-      let products = await Product.find({ $and: [{ productName: regex }]}).skip(skip).limit(endIndex).populate('category').lean();
-      let categorys = await Category.find().lean();
+      let filterCondition = [{ productName: regex }]
 
-      //product category search
-      let filterCategory = req.query.category || 'All'
-      
-      if (filterCategory != 'All') {
-        let categoryProduct = [];
-        products.forEach(product => {
-          if (product.category.categoryName == filterCategory) {
-            categoryProduct.push(product)
-          };
-        });
-        products = categoryProduct;
-      };
+      if (filterCategory !== 'All') {
+        filterCondition.push({ 'category': filterCategory });
+      }
+
+      let products = await Product.find({ $and: filterCondition }).skip(skip).limit(endIndex).populate('category').lean();
+      let categorys = await Category.find().lean();
 
       res.render("admin/products", {
         tittle: "GadgetStore | Admin products",
         message: req.flash(),
         products,
         categorys,
+        filterCategory,
+        productName
       });
     } catch (error) {
       next(error);
@@ -142,6 +143,7 @@ module.exports = {
       res.render("admin/add-products", {
         tittle: "GadgetStore | Admin Add product",
         categorys: categorys,
+        message:req.flash()
       });
     } catch (error) {
       next(error);
@@ -151,7 +153,14 @@ module.exports = {
   addProduct: async (req, res, next) => {
     try {
         let { productName, price, brand, category, specification, description, stock } = req.body;
-     
+      
+      //input validation
+      let result = productInputValidation(productName, price, brand, description, stock);
+      if (!result.validation) {
+        req.flash(`${result.input}`, `Invalid ${result.input}`);
+        return res.redirect('/admin/product/add');
+      };
+      
       //product images
       let images = req.files;
       let imagesPaths = [];
@@ -197,6 +206,7 @@ module.exports = {
       let categorys = await Category.find().lean();
       res.render("admin/edit-product", {
         tittle: "GadgetStore | Admin edit Product",
+        message: req.flash(),
         product,
         categorys,
       });
@@ -267,6 +277,14 @@ module.exports = {
         stock,
         specification,
       } = req.body;
+
+      //input validation
+      let result = productInputValidation(productName, price, brand, description, stock);
+      if (!result.validation) {
+        req.flash(`${result.input}`, `Invalid ${result.input}`);
+        return res.redirect(`/admin/product/${productId}/edit`);
+      };
+
       //product images
       let newImages = req.files;
       let imagesPaths = [];
@@ -389,7 +407,7 @@ module.exports = {
   adminUserUnblock: async (req, res, next) => {
     try {
       let userId = req.params.user_id;
-      let status = "unverified";
+      let status = "verified";
       await User.updateOne({ _id: userId }, { accountStatus: status });
       res.redirect(`/admin/user/${userId}/view`);
     } catch (error) {
@@ -412,18 +430,62 @@ module.exports = {
 
   addCategory: async (req, res, next) => {
     try {
-      let categoryName = new RegExp(req.body.categoryName,'i');
-      let iscategory = await Category.findOne({ categoryName: categoryName });
+      let categoryName = req.body.categoryName;
 
-      //check if category already exists
-      if (iscategory) {
-        req.flash('error', 'Category already exists');
-        return res.redirect('/admin/category');
+      if (/^[A-Za-z]+$/.test(categoryName)) {
+
+        let iscategory = await Category.findOne({ categoryName: new RegExp("^" + categoryName + "$", 'i') });
+
+        //check if category already exists
+        if (iscategory) {
+          req.flash('error', 'Category already exists');
+          return res.redirect('/admin/category');
+        };
+
+        await Category.create({ categoryName });
+        req.flash('message', 'Category Created');
+        res.redirect('/admin/category');
+        
+      } else {
+        req.flash('error', 'Invalid Input');
+        res.redirect('/admin/category');
       }
+    } catch (error) {
+      next(error);
+    }
+  },
 
-      await Category.create({ categoryName });
-      req.flash('message', 'Category Created');
-      res.redirect('/admin/category');
+  editCategoryPage: async (req, res, next) => {
+    try {
+      let categoryId = req.params.category_id;
+      let category = await Category.findOne({ _id: categoryId });
+      res.render('admin/edit-category', {
+        tittle: 'GadgetStore | Edit Category',
+        category,
+        message: req.flash()
+      })
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  editCategory: async(req, res, next)=>{
+    try {
+      let categoryId = req.params.category_id;
+      let { categoryName } = req.body;
+      let result = isValidInput(categoryName);
+      if (!result) {
+        req.flash('error', 'Invalid Input');
+        return res.status(200);
+      };
+      let category = await Category.findOneAndUpdate({ _id: categoryId }, { $set: { categoryName } });
+      if (!category) {
+        req.flash('error', 'not updated');
+        return res.status(200);
+      }
+      
+      req.flash('message', 'Category edited');
+      return res.status(200).json({ success: true });
     } catch (error) {
       next(error);
     }
@@ -441,7 +503,7 @@ module.exports = {
 
   adminOrdersPage: async (req, res, next) => {
     try {
-      let orders = await Order.find().populate('user_id').lean();
+      let orders = await Order.find().populate('user_id').sort({orderDate:-1});
       res.render('admin/orders', {
         tittle: 'GadgetStore | Admin Orders',
         orders
@@ -458,9 +520,13 @@ module.exports = {
         .populate('user_id')
         .populate('orderAddress')
         .populate('items.product')
+      
+      let returnDetails  = await OrderReturn.findOne({ order_id: order._id });
+      
       res.render('admin/order-details', {
         tittle: 'GadgetStore | Order Details',
-        order
+        order,
+        returnDetails
       })
     } catch (error) {
       next(error);
@@ -473,10 +539,117 @@ module.exports = {
       let status = req.body;
       let order = await Order.findOneAndUpdate({ _id: orderId }, { $set: { orderStatus: status.orderStatus } });
       
-      res.json('done');
+      res.status(200).json('done');
     } catch (error) {
       next(error);
     }
   },
+
+  returnOrder: async (req, res, next) => {
+    try {
+      let orderId = req.params.order_id;
+      console.log(orderId)
+      let returnDetails = await OrderReturn.findOne({ order_id: orderId });
+
+      if (returnDetails) {
+        let order = await Order.findOneAndUpdate({ _id: orderId }, { $set: { orderStatus: 'Return Accepted' } });
+        let userWallet = await Wallet.findOne({ user_id: order.user_id });
+
+        let transactions = [{
+          order_id: order._id,
+          method: 'Credit',
+          amount: order.totalPrice
+        }]
+
+        if (!userWallet) {
+          userWallet = await Wallet.create({
+            user_id: order.user_id,
+            balance: order.totalPrice,
+            transactions
+          })
+        } else {
+          //updating user wallet
+          let balance = userWallet.balance + order.totalPrice;
+          await Wallet.updateOne({ _id: userWallet._id }, {
+            $push: { transactions: transactions },
+            $set: { balance: balance }
+          });
+        }
+
+        //updateing stocks of non damage products
+        if (returnDetails.reason !== 'Damaged') {
+          order.items.forEach(async (item) => {
+            let product = await Product.findOne({ _id: item.product });
+            let currentStock = product.stock + item.quantity;
+            await Product.updateOne({ _id: item.product }, { $set: { stock: currentStock } });
+          });
+        };
+      } else {
+        res.status(500).json({ success: false });
+      }
+     
+      res.status(200).json({ success: true });
+
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  couponsPage: async (req, res, next) => {
+    try {
+      let coupons = await Coupon.find();
+      res.render('admin/coupons', {
+        tittle: 'GadgetStore | Coupons',
+        message: req.flash(),
+        coupons
+      })
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  addCouponPage: async (req, res, next) => {
+    try {
+      res.render('admin/add-coupon', {
+        tittle:'GadgetStore | Coupons'
+      })
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  addCoupon: async (req, res, next) => {
+    try {
+      let { couponName, description, discount, expriyDate } = req.body;
+      let code = uuidv4()
+      let newCoupon = await Coupon.create({
+        couponName,
+        description,
+        discount,
+        code,
+        expriyDate,
+      });
+      if (!newCoupon) {
+        req.flash('error', 'coupon not created');
+      }
+
+      req.flash('message', 'Coupon Created');
+      res.redirect('/admin/coupons');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteCoupon: async (req, res, next) => {
+    try {
+      let couponId = req.params.id;
+      let coupon = await Coupon.findOneAndDelete({ _id: couponId });
+      if (coupon) {
+        res.status(200).json({ success: true });
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
 
 };

@@ -49,8 +49,20 @@
               <tr>
                 <th scope="row"><%= serialNumber %></th>
                 <td><%= eachCategory.categoryName %></td>
+                <!-- <td>
+                  <form action="/" name="categoryForm" onsubmit="return validateForm()" method="post">
+                    Category : <input type="text" name="categoryName">
+                    <input type="submit" value="submit">
+                  </form>
+                </td> -->
                 <td>
-                  <button type="button" class="btn btn-danger border-dark px-3 py-1" data-bs-toggle="modal" data-bs-target="#deleteCategory" onclick="setCategoryId('<%= eachCategory._id %>')">Delete</button>
+                  <a class="btn btn-outline-dark border-dark px-3 py-1" href="/admin/category/<%= eachCategory._id %>/edit">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </a>
+                  <button type="button" class="btn btn-danger border-dark px-3 py-1" data-bs-toggle="modal" data-bs-target="#deleteCategory" 
+                  onclick="setCategoryId('<%= eachCategory._id %>')">Delete
+                </button>
+                
                 </td>
               </tr>
               <% serialNumber++; %>
@@ -60,7 +72,7 @@
         </div>
     </div>
     
-  <!--modal-->
+  <!--modal for delete category-->
   <div class="modal fade" id="deleteCategory" tabindex="-1" aria-labelledby="deleteCategory" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -78,8 +90,7 @@
       </div>
     </div>
   </div>
-
-    
+  
 
 
 
@@ -94,6 +105,14 @@ let currentCategoryId;  // Variable to store the current category ID
 function setCategoryId(categoryId) {
   currentCategoryId = categoryId;
 }
+
+// function validateForm() {
+//   let x = document.forms["categoryForm"]["categoryName"].value;
+//   if (x == " ") {
+//     alert("Name must be filled out");
+//     return false;
+//   }
+// }
   
 async function confirmDelete(){
   try {

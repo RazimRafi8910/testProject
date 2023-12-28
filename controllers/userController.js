@@ -5,19 +5,29 @@ const Address = require('../models/address');
 const Cart = require('../models/cart');
 const productReview = require('../models/productReview');
 const Order = require('../models/order');
+const bcrypt = require("bcrypt");
+const Wallet = require("../models/wallet");
+const { isValidInput, addressValidation } = require('../config/inputValidation');
+const { GenerateOTP } = require("../config/OTPauth");
+const OrderReturn = require('../models/orderReturn');
+const Coupon = require('../models/coupon');
+const razorPayOrderGenerate = require('../config/razorPay');
+const Wishlist = require('../models/wishlist');
 
 module.exports = {
   
   userHomePage: async (req, res, next) => {
     try {
+      let user = req.user;
       let newProducts = await Product.find({ isListed: true }).limit(4).lean();
       let products = await Product.find({ isListed: true }).populate('category').lean();
-      let user = req.user;
+      // let userWishlist = await Wishlist.findOne({ user_id: user._id }).populate('items.product_id');
+      
       res.render('shop/home', {
         tittle: 'GadgetStore | Home',
         newProducts,
         products,
-        user
+        user,
       });
 
     } catch (error) {
@@ -27,42 +37,43 @@ module.exports = {
 
   userProductsPage: async (req, res, next) => {
     try {
-      
+      let user = req.user;  
+      // let userWishlist = await Wishlist.findOne({ user_id: user._id }).populate('items.product_id');
       let productName = req.query.productName || "";
       let filterPrice = req.query.priceFilter || 1000000
       let filterCategory = req.query.category || 'All'
       const regex = new RegExp(productName, "i");
+
+      let filterCondition = [
+        { productName: regex },
+        { price: { $lte: filterPrice } },
+        { isListed: true }
+      ]
+
+      if (filterCategory != 'All') {
+        filterCondition.push({ 'category': filterCategory });
+      }
 
       //pagination
       let page = req.query.page || 1;
       let limit = 9;
       let skip = (page - 1) * limit;
       let endIndex = page * limit;
-      let products = await Product.find({ $and: [{ productName: regex }, { price: { $lte: filterPrice } }, { isListed: true }] })
+      let products = await Product.find({ $and: filterCondition })
         .skip(skip).limit(endIndex).populate('category');
-
-      let filteredProducts = products
-      if (filterCategory != 'All') {
-        let categoryProduct = [];
-        products.forEach(product => {
-          if (product.category.categoryName == filterCategory) {
-            categoryProduct.push(product)
-          }
-        })
-        filteredProducts = categoryProduct;
-      } 
-    
+      
       
       let categorys = await Category.find().lean();
-      let user = req.user;
+      
 
       res.render('shop/product-list', {
         tittle: 'GadgetStore | Products',
         message:req.flash(),
-        filteredProducts,
+        products,
         filterCategory,
         filterPrice,
         categorys,
+        productName,
         user
       });
 
@@ -71,43 +82,13 @@ module.exports = {
     }
   },
 
-  productSearch: async (req, res, next) => {
-    try {
-      let productName = req.query.productName;
-      console.log(req.query);
-      const regex = new RegExp(productName, "i");
-
-      let products = await Product.find({
-        $and: [
-          { productName: regex },
-          { isListed: true }
-        ]
-      }).lean()
-            
-      let categorys = await Category.find().lean();
-
-          if (products.length===0) {
-              req.flash('error', 'No products found');
-      };
-      
-      res.render('user/product-list', {
-        tittle: 'GadgetStore | Products',
-        message: req.flash(),
-        products,
-        categorys,
-        user
-      });
-
-    } catch (error) {
-      
-    }
-  },
 //products details page
   productDetails: async (req, res, next) => {
     try {
       let productId = req.params.product_id;
       let product = await Product.findById(productId).populate('category');
       let productReviews = await productReview.findOne({ product_id: product._id });
+      // let userWishlist = await Wishlist.findOne({ user_id: user._id }).populate('items.product_id');
       let user = req.user;
 
       res.render('shop/product-details', {
@@ -155,16 +136,20 @@ module.exports = {
   },
 
 //user Profile
-  userProfile:async (req, res) => {
+  userProfile: async (req, res, next) => {
     try {
       let user = req.user;
+      let userDetails = await User.findOne({ _id: user._id }).populate('coupons.coupon_id');
       let userAddress = await Address.find({ user_id: user._id });
-      let userOrders = await Order.find({ user_id: user._id });
+      let userOrders = await Order.find({ user_id: user._id }).sort({ orderDate: -1 });
+      let userWallet = await Wallet.findOne({ user_id: user._id });
       res.render('user/profile', {
         tittle: 'GadgetStore | Profile',
         user,
         userAddress,
         userOrders,
+        userWallet,
+        userDetails,
         message: req.flash(),
       });
     } catch (error) {
@@ -172,15 +157,89 @@ module.exports = {
     }
   },
 
-  userProfileEdit: async (req, res, next) => {
+  userProfileEditPage: async (req, res, next) => {
     try {
       let user = req.user;
       res.render('user/edit-profile', {
         tittle: 'GadgetStore | Profile',
         user,
+        message:req.flash(),
       });
     } catch (error) {
       next(error)
+    }
+  },
+
+    userProfileEdit: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let { username, number, email } = req.body;
+
+      //input validation
+      if (number.length !== 10) {
+        req.flash('error', 'Invalid Phone number');
+        return res.status(200).json({ inputValidation: false });
+      }
+      let result = isValidInput(username);
+      if (result === false) {
+        req.flash('error', 'Invalid username ');
+        return res.status(200).json({ inputValidation: false });
+      }
+
+      let updateFields = {
+        username,
+        number:Number(number),
+        email
+      }
+      
+      let updatedUser = await User.findOneAndUpdate({ _id: user._id }, updateFields, { new: true });
+
+      if (!updatedUser) {
+        req.flash('error', 'Not updated');
+        return res.status(500).json('error')
+      }
+      //new email verifcation
+      if (email !== user.email) {
+        GenerateOTP(email);
+        return res.status(200).json({ newEmail: true });
+      }
+
+      req.flash('update', 'Profile Updated');
+      res.status(200).json({ newEmail:false});
+    } catch (error) {
+      next(error);
+    }
+  },
+    
+  changePassword: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let { password, newPassword, confirmPassword } = req.body;
+      let passwordMatch = await bcrypt.compare(password, user.password);
+      
+      if (passwordMatch === false) {
+        req.flash('password', 'Incorrect Old Password');
+        return res.status(200).json({ passwordStatus: false });
+      }
+
+      if (newPassword !== confirmPassword) {
+        req.flash('password', 'Confirm Correct Password');
+        return res.status(200).json({ passwordStatus: false });
+      }
+
+      if (newPassword.length < 6) {
+        req.flash('password', 'Your password must be at least 6 characters');
+        return res.status(200).json({ passwordStatus: false });
+      }
+
+      let hashPassword = await bcrypt.hash(newPassword, 6);
+      await User.updateOne({ _id: user._id }, { $set: { password: hashPassword } });
+
+      req.flash('update', 'Password Changed');
+      res.status(200).json({ passwordStatus: true });
+
+    } catch (error) {
+      next(error);
     }
   },
 
@@ -192,10 +251,25 @@ module.exports = {
     });
   },
 
+  userWalletPage: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let userWallet = await Wallet.findOne({ user_id: user._id }); 
+      res.render('user/wallet', {
+        tittle: 'GadgetStore | Wallet',
+        userWallet,
+        user
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   addAddressPage: (req, res) => {
     let user = req.user;
     res.render('user/new-address', {
       tittle: 'GagetStore | New Address',
+      message:req.flash(),
       user
     })
   },
@@ -204,7 +278,14 @@ module.exports = {
     try {
       let userId = req.params.user_id;
       let { houseName, town, address, city, state, pincode, addressType } = req.body;
-      
+
+      let result = addressValidation(houseName, town, address, city, state, pincode);
+
+      if (!result.validation) {
+        req.flash(`${result.input}`, `Invalid ${result.input}`);
+        return res.redirect(`/address/${userId}/add`);
+      }
+
       let newAddress = await Address.create({
         user_id:userId,
         houseName,
@@ -237,6 +318,7 @@ module.exports = {
       res.render('user/edit-address.ejs', {
         tittle: 'GagetStore | Edit Address',
         user,
+        message:req.flash(),
         address
       })
     } catch (error) {
@@ -248,6 +330,14 @@ module.exports = {
     try {
       let addressId = req.params.address_id;
       let { houseName, town, address, city, state, pincode, addressType } = req.body;
+
+      let result = addressValidation(houseName, town, address, city, state, pincode);
+
+      if (!result.validation) {
+        req.flash(`${result.input}`, `Invalid ${result.input}`);
+        return res.redirect(`/address/${addressId}/edit`)
+      };
+
       let updateFields = {
         houseName,
         town,
@@ -292,19 +382,93 @@ module.exports = {
     try {
       let user = req.user;
       let userCart = await Cart.findOne({ user_id: user._id }).populate('items.product');
+      let coupon = await Coupon.find({ couponName: 'Buymore' });
       let totalPrice = 0;
+      let discountPrice = 0;
       if (userCart) {
         userCart.items.forEach(item => {
           totalPrice += item.product.price * item.quantity;
         });
-      }
+
+        if (userCart.discount > 0) {
+          discountPrice = (totalPrice / 100) * userCart.discount;
+          totalPrice = totalPrice - discountPrice;
+        }
+      };
+
+      
       res.render('user/user-cart', {
         tittle: 'GadgetStore | Cart',
         message: req.flash(),
         user,
         userCart,
-        totalPrice
+        totalPrice,
+        coupon,
+        discountPrice
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  wishlistPage: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let userWishlist = await Wishlist.findOne({ user_id: user._id }).populate('items.product_id');
+      res.render('user/wishlist', {
+        tittle: 'GagetStore | Wishlist',
+        user,
+        userWishlist,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  addProductToWishlist: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let productId = req.params.product_id;
+      let product = await Product.findOne({ _id: productId });
+      let userWishlist = await Wishlist.findOne({ user_id: user._id })
+      let items = [{
+        product_id: product._id
+      }];
+
+      let itemExist
+      if (userWishlist) {
+        userWishlist.items.forEach(item => {
+          if (item.product_id.toString() == productId) {
+            itemExist = true
+          }
+        });
+
+        if (itemExist) {
+          return res.status(200).json({ itemfound: true });
+        } else {
+          let result = await Wishlist.findOneAndUpdate({ _id: userWishlist._id }, { $push: { items } });
+        }
+      } else {
+        await Wishlist.create({
+          user_id: user._id,
+          items
+        });
+      };
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  wishlistRemoveItem: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let productId = req.params.product_id;
+      let product = await Wishlist.findOneAndUpdate({ user_id: user._id }, { $pull: { items: { product_id: productId } } });
+      if (product) {
+        res.status(200).json({ success: true });
+      }
     } catch (error) {
       next(error);
     }
@@ -316,13 +480,13 @@ module.exports = {
       let productId = req.params.product_id;
       let itemQuantity = req.body.quantity || 1;
       let productQuantity = Number(itemQuantity);
+      let product = await Product.findOne({ _id: productId });
 
       let items = {
         product: productId,
         quantity:productQuantity
       };
 
-      let product = await Product.findOne({ _id: productId });
       //checking the stock of the product
       if (product.stock <= 0 || productQuantity > product.stock) {
         req.flash('error', 'out of stock')
@@ -330,17 +494,12 @@ module.exports = {
       }
       let userCart = await Cart.findOne({ user_id: user._id }).populate('items.product');
 
-      //removing the stock from the product data
-      let leftStock = product.stock-productQuantity
-      await Product.updateOne({ _id: productId }, { $set: { stock: leftStock } });
-
+      //create user cart if not exist
       if (!userCart) {
-        console.log(userCart);
         await Cart.create({
           user_id:user._id,
           items
-        }); 
-        console.log('sdf')
+        });
         req.flash('message', 'product added to Cart');
         return res.redirect('/cart');
       }
@@ -372,7 +531,7 @@ module.exports = {
     try {
       let productId = req.params.product_id;
       let user = req.user;
-      let cartQuantity = req.body;
+      let cartQuantity = req.body; // cartQuantity.change - change of the items (+1/-1)
       let product = await Product.findOne({ _id: productId });
       let userCart = await Cart.findOne({ user_id: user._id });
       let currentQuantity 
@@ -391,6 +550,7 @@ module.exports = {
         currentQuantity++;
         productStock--;
       }
+
       if (cartQuantity.change === -1 && currentQuantity >= 1) {
         currentQuantity--;
         productStock++;
@@ -411,6 +571,7 @@ module.exports = {
       let userCart = await Cart.findOne({ user_id: user._id }).populate('items.product');
       let product = await Product.findOne({ _id: productId });
       let productQuantity = 0
+
       //checking the product quantity
       userCart.items.forEach((item) => {
         if (item.product._id.toString() === productId) {
@@ -430,14 +591,56 @@ module.exports = {
     }
   },
 
+  couponAddToCart: async (req, res, next) => {
+    try {
+      let cartId = req.params.cart_id;
+      let user = req.user;
+      let { couponCode } = req.body;
+      let userDetails = await User.findOne({ _id: user._id });
+      let coupon = await Coupon.findOne({ code: couponCode });
+
+      if (!coupon) {
+        req.flash('couponError', 'No Coupon found');
+        return res.redirect('/cart');
+      }
+      
+      //check user alreay used coupon
+      let couponUsed 
+      userDetails.coupons.forEach((userCoupon) => { 
+        if (userCoupon.coupon_id.toString()==coupon._id) {
+          couponUsed = userCoupon.isUsed
+        }
+      });
+
+      if (couponUsed) {
+        req.flash('couponError', 'Coupon Code already used');
+        return res.redirect('/cart');
+      }
+      
+      //add coupon to cart 
+      let updateFields = {
+        coupon: coupon._id,
+        discount:coupon.discount
+      }
+      let result = await Cart.findOneAndUpdate({ _id: cartId }, updateFields, { new: true });
+      req.flash('coupon', 'Coupon Added');
+      res.redirect('/cart');
+
+    } catch (error) {
+      next(error)
+    }
+  },
+
   cartCheckoutPage: async (req, res, next) => {
     try {
       let cartId = req.params.cart_id;
       let user = req.user;
       let userCart = await Cart.findOne({ _id: cartId }).populate('items.product');
       let userAddress = await Address.find({ user_id: user._id });
+      let userWallet = await Wallet.findOne({ user_id: user._id });
       let totalPrice = 0;
       let quantityCheck = false;
+
       //calculating total price of the product
       userCart.items.forEach(item => {
         if (item.quantity < 1) {
@@ -445,16 +648,28 @@ module.exports = {
         }
         totalPrice += item.product.price * item.quantity;
       });
+
+      //coupon discount to total price
+      let discountPrice = 0;
+      if (userCart.discount > 0) {
+        discountPrice = (totalPrice / 100) * userCart.discount;
+        totalPrice = totalPrice - discountPrice;
+      }
+
       if (quantityCheck) {
-        req.flash('error', 'zero quantity on product');
+        req.flash('error', 'zero quantity on product, increase the quantity or remove product');
         return res.redirect('/cart');
       }
+
       res.render('user/checkout', {
         tittle: 'GadgetStore | Checkout',
         userAddress,
         userCart,
         user,
-        totalPrice 
+        totalPrice,
+        userWallet,
+        discountPrice,
+        message:req.flash(),
       })
     } catch (error) {
       next(error);
@@ -470,6 +685,7 @@ module.exports = {
         tittle: 'GadgetStore | Order',
         user,
         userOrder,
+        message:req.flash(),
       })
     } catch (error) {
       next(error);
@@ -480,43 +696,180 @@ module.exports = {
   try {
     let user = req.user;
     let userCartId = req.params.cart_id;
-    let { addressId, paymentMethod } = req.body;
+    let { addressId, paymentMethod, walletAmount } = req.body;
     let userCart = await Cart.findOne({ _id: userCartId }).populate('items.product');
+    let userWallet = await Wallet.findOne({ user_id: user._id });
     let orderItems = userCart.items;
     let orderStatus = 'Processing';
     let totalPrice = 0
+    let discountPrice = 0;
 
-    //calculating total price
-    userCart.items.forEach(item => {
+    //calculating total price and removing the stock from the product data
+    userCart.items.forEach(async (item) => {
+      let leftStock = item.product.stock - item.quantity;
       totalPrice += item.product.price * item.quantity;
+      await Product.updateOne({ _id: item.product._id }, { $set: { stock: leftStock } });
     });
 
+    //coupon discount to total price
+    if (userCart.discount > 0) {
+      discountPrice = (totalPrice / 100) * userCart.discount;
+      totalPrice = totalPrice - discountPrice;
+      //updating user coupon is used
+      // await User.updateOne({ _id: user._id, "coupons.coupon_id": userCart.coupon }, { $set: { "coupons.$.isUsed": true } }, { new: true });
+    };
+
+    //checks the wallet balance and input amount
+    if (walletAmount) {
+      if (walletAmount > userWallet.balance || walletAmount > totalPrice){
+        req.flash('error', 'The wallet balance exceeds the expected amount');
+        return res.status(200).json({ success: false });
+        
+      } else {
+        if (totalPrice == walletAmount) {
+          paymentMethod = 'PaidOnWallet';
+        } else {
+          totalPrice = totalPrice - walletAmount;
+        }
+      };
+    };
+
+    //order creating
     let order = await Order.create({
       user_id: user._id,
       orderAddress: addressId,
-      items:orderItems,
+      items: orderItems,
       paymentMethod,
       orderStatus,
       totalPrice
-    })
+    });
 
     if (!order) {
       req.flash('error', 'order not created');
-      return res.redirect('/cart');
+      return res.status(200).json({ success: false, payment: false});
     }
+
+    if (walletAmount) {
+      let transactions = [{
+        order_id: order._id,
+        method: 'Debit',
+        amount: walletAmount
+      }]  
+      //updating user wallet balance
+    let remainingBalance = userWallet.balance - walletAmount;
+    await Wallet.updateOne({ _id: userWallet._id }, { $set: { balance: remainingBalance }, $push: { transactions } }, { new: true });
+    } 
+
+    //coupon
+    // if (order.totalPrice > 10000) {
+      
+    //   let coupon = await Coupon.findOne({ couponName: 'Buymore' });
+    //   let userCoupon = [{
+    //     coupon_id: coupon._id,
+    //     isUsed: false,
+    //     discount: coupon.discount
+    //   }];
+
+    //   let existCoupon;
+    //   user.coupons.forEach((userCoupon) => {
+    //     if (userCoupon.coupon_id.toString() == coupon._id) {
+    //       existCoupon = true;
+    //     }
+    //   });
+
+    //   if (!existCoupon) {
+
+    //     //check user coupons exist if not create
+    //   let userResult;
+    //   if (!user.coupon) {
+    //     userResult = await User.updateOne({ _id: user._id }, { $set: { coupons: userCoupon } });
+    //   } else {
+
+    //     let isCouponHave
+    //     user.coupons.forEach((coupon) => {
+    //       if (coupon.coupon_id == coupon._id) {
+    //         isCouponHave = true;
+    //       }
+    //     });
+
+    //     if (!isCouponHave) {
+    //       userResult = await User.updateOne({ _id: user._id }, { $push: { coupons: userCoupon } });
+    //     }
+        
+    //   };
+    // };
+    //   }
+      //razorpay online paymanet
+    if (totalPrice !== walletAmount && paymentMethod === 'onlinePayment') {  
+      let razorPayOrder = await razorPayOrderGenerate(order._id, totalPrice);
+      return res.status(200).json({ success: true, payment: true, orderId: order._id, razorPayOrder, user });
+    }
+
     await Cart.deleteOne({ _id: userCart._id });
-    req.flash('message', 'Order created');
-    res.redirect(`/order/${order._id}`)
-    
+    req.flash('message', 'your order has been successfully created');
+    res.status(200).json({ success: true, payment: false, orderId: order._id });
   } catch (error) {
     next(error)
   }
   },
 
+  orderPaymentVerify: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let orderId = req.params.order_id;
+      let { razorpay_payment_id } = req.body;
+      if (razorpay_payment_id) {
+        req.flash('message', 'Payment success');
+        await Cart.deleteOne({ user_id: user._id });
+      }
+      res.redirect(`/order/${orderId}`);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  returnOrder: async (req, res, next) => {
+    try {
+      let user = req.user;
+      let orderId = req.params.order_id;
+      let { reason } = req.body;
+
+      let userOrder = Order.findOne({ _id: orderId });
+
+      let orderDate = userOrder.orderDate;
+      let currentDate = Date.now();
+      let daysAgo = Math.floor((currentDate - orderDate) / (1000 * 60 * 60 * 24)); // Calculate days difference
+
+      if (daysAgo > 7) {
+        req.flash('error', 'Order can only return with 7 Days')
+        return res.redirect('/profile');
+      }
+
+      let orderReturn = {
+        order_id: orderId,
+        reason,
+        status:'Pending'
+      }
+      let returnDetails = await OrderReturn.create(orderReturn);
+
+      if (returnDetails) {
+        await Order.updateOne({ _id: orderId }, { $set: { orderStatus: 'Return Pending' } });
+        return res.redirect(`/order/${orderId}`);
+      }
+      
+      req.flash('error', 'Error occured');
+      res.redirect('/profile');
+
+    } catch (error) {
+      next(error);
+    }
+  },
+
   cancelOrder: async (req, res, next) => {
     try {
+      let user = req.user;
       let orderId = req.params.order_id;
-      let order = await Order.findOneAndDelete({ _id: orderId });
+      let order = await Order.findOneAndUpdate({ _id: orderId },{$set:{orderStatus:'Cancelled'}});
 
       // adding the cancelled items stock to product db
       order.items.forEach(async (item) => {
@@ -524,6 +877,33 @@ module.exports = {
         let currentStock = product.stock + item.quantity;
         await Product.updateOne({ _id: item.product }, { $set: { stock: currentStock } });
       })
+
+      // refund for online payment
+      if (order.paymentMethod === 'onlinePayment' || order.paymentMethod === 'PaidOnWallet') {
+        let userWallet = await Wallet.findOne({ user_id: order.user_id });
+        let transactions = [{
+          order_id: order._id,
+          method: 'Credit',
+          amount: order.totalPrice
+        }]
+
+        if (!userWallet) {
+          userWallet = await Wallet.create({
+            user_id: order.user_id,
+            balance: order.totalPrice,
+            transactions
+          })
+        } else {
+          //updating user wallet
+          let balance = userWallet.balance + order.totalPrice;
+          await Wallet.updateOne({ _id: userWallet._id }, {
+            $push: { transactions: transactions },
+            $set: { balance: balance }
+          });
+        }
+        req.flash('message', 'Refund added to Wallet');
+      }
+
       res.redirect('/')
     } catch (error) {
       next(error);

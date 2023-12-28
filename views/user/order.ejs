@@ -2,11 +2,33 @@
     <%- include('../partials/user-navbar.ejs') %>
 
     <div class="container">
+      <div class="row my-3">
+        <% if( message.message ) { %>
+          <div class="alert alert-success text-center" role="alert">
+              <%= message.message %>
+            </div>
+            <% } %>
+            <% if( message.error ) { %>
+              <div class="alert alert-danger" role="alert">
+                  <%= message.error %>
+                </div>
+                <% } %>
+                <% if( message.newCoupon ) { %>
+                  <div class="alert alert-success text-center" role="alert">
+                      <%= message.newCoupon %>
+                    </div>
+                    <% } %>
+      </div>
+      
+    </div>
+    
+
+    <div class="container">
         <div class="row mt-4">
             <h1 class="mb-0">Order Details</h1>
                 <hr class="mt-0">
         </div>
-
+        
         <div class="row">
             <h2 class="mx-2">Items</h2>
             <hr>
@@ -65,7 +87,19 @@
                 </div>
                 
                 <div class="d-flex ">
-                    <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 "><%= userOrder.orderStatus %></p>
+                  <% if(userOrder.orderStatus === 'Processing'){ %>
+                    <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold text-muted"><%= userOrder.orderStatus %></p>
+                    <% } else if(userOrder.orderStatus === 'Confrimed') { %>
+                      <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold"><%= userOrder.orderStatus %></p>
+                      <% } else if(userOrder.orderStatus === 'Shipping') { %>
+                        <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold text-warning"><%= userOrder.orderStatus %></p>
+                        <% } else if(userOrder.orderStatus === 'Cancelled') {%>
+                          <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold text-danger"><%= userOrder.orderStatus %></p>
+                          <% } else if(userOrder.orderStatus === 'Return Pending') {%>
+                            <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold text-danger"><%= userOrder.orderStatus %></p>
+                          <% } else { %> 
+                            <h5 class="mt-1 ">Status :</h5><p class=" my-0 fs-5 fw-bold text-success"><%= userOrder.orderStatus %></p>
+                            <% } %>
                 </div>
                 <div class="d-flex">
                     <h5 class="mt-1">Address :</h5>
@@ -97,7 +131,13 @@
           </div>
           <div class="d-flex justify-content-between">
             <p class="m-2">Payment:</p>
+            <% if(userOrder.paymentMethod === 'cashOnDelivery') {%>
             <p class="m-2 text-dark">Cash On Delivery</p>
+            <% } else if(userOrder.paymentMethod === 'PaidOnWallet') { %>
+              <p class="m-2 text-success fw-bold">Paid with Wallet</p>
+              <% } else { %>
+                <p class="m-2 text-success">Paid</p>
+                <% } %>
           </div>
           <hr />
           <div class="d-flex justify-content-between">
@@ -113,11 +153,27 @@
 
   <div class="row mt-5">
         <div class=" d-flex justify-content-center">
-            <button type="button" data-bs-toggle="modal" data-bs-target="#cancelOrder" class="btn btn-danger py-2 px-5">Cancel Order</button>
-        </div>
+          <% let orderDate = userOrder.orderDate; %>
+          <% let currentDate = Date.now(); %>
+          <% let daysAgo = Math.floor((currentDate - orderDate) / (1000 * 60 * 60 * 24)); %>
+
+          <% if(userOrder.orderStatus === 'Delivered') { %>
+          <% if(daysAgo < 7) { %>
+            <button type="button" data-bs-toggle="modal" data-bs-target="#returnOrder" class="btn btn-danger py-2 px-5">Return Order</button>
+            <% } %>
+          <% } else if(userOrder.orderStatus === 'Return Pending' ) { %>  
+            <p class="text-secondary">Return Pending</p>
+            <% } else if(userOrder.orderStatus === 'Return Accepted') {%>
+              <p class="text-success">Return Accepted</p>
+            <% } else if(userOrder.orderStatus === 'Cancelled') { %>
+              <p class="text-danger">Order Cancelled</p>
+              <% } else { %>
+                <button type="button" data-bs-toggle="modal" data-bs-target="#cancelOrder" class="btn btn-danger py-2 px-5">Cancel Order</button>
+                <% } %>
+          </div>
   </div>
 
-<!-----modal for delete addresss---->
+<!-----modal for cancel order---->
 <div class="modal fade" id="cancelOrder" tabindex="-1" aria-labelledby="cancelOrder" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -130,12 +186,44 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-danger" onclick="cancelOrder('<%= userOrder._id %>')">Delete</button>
+        <button type="button" class="btn btn-danger" onclick="cancelOrder('<%= userOrder._id %>')">Cancel</button>
       </div>
     </div>
   </div>
 </div>
 
+
+<!-- modal for Return Order -->
+<div class="modal fade" tabindex="-1" role="dialog" id="returnOrder" aria-labelledby="returnOrder" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content borer-top border-secondary">
+      <form action="/order/<%= userOrder._id%>/return" method="post">
+      <div class="modal-body text-center my-">
+        <h3>Return Form</h3>
+        <hr>
+        <div class="row my-4">
+          <label for="inputEmail3" class="col-sm-2 col-form-label">Reason</label>
+          <div class="col-sm-10">
+            <select id="inputState" name="reason" class="form-select" required>
+              <option selected>Choose...</option>
+              <option>Damaged</option>
+              <option>High Price</option>
+              <option>Low Quality</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <p>Refund will add to Wallet</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <button type="submit" class="btn btn-primary">Return</button>
+    </div>
+  </form>
+</div>
+</div>
+
+</div>
 </div>
 
     <%- include('../partials/footer.ejs') %>
@@ -146,12 +234,12 @@
       async function cancelOrder(orderId){
         try {
           let responce =  await fetch(`/order/${orderId}/cancel`,{
-            method:'DELETE',
+            method:'PUT',
             headers: {
           'Content-Type': 'application/json',
           }});
           console.log(responce)
-          window.location.href = '/'
+          window.location.href = '/profile'
         } catch (error) {
           
         }

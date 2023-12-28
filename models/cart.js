@@ -6,6 +6,15 @@ let cartShcema = mongoose.Schema({
         required: true,
         ref: 'user'
     },
+    coupon: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref:'coupon'
+    },
+    discount: {
+        type: Number,
+        required: true,
+        default:0
+    },
     items: [{
         product: {
             type: mongoose.Schema.Types.ObjectId,

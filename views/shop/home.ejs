@@ -43,12 +43,12 @@
               </a>
                 <div class="d-flex align-items-end pt-1 px-0 pb-0 mt-auto">
                   <button type="button" onclick="addToCart('<%= product._id %>')" class="btn btn-dark shadow-0 me-1">Add to cart</button>
-                  <a href="" class="btn btn-light border px-2 pt-2 icon-hover">
-                    <i class="fas fa-heart fa-lg text-secondary px-1"></i>
-                  </a>
+                  <button type="button" onclick="addToWishlist('<%= product._id %>')" class="btn btn-outline-secondary border px-2 pt-2 icon-hover">
+                    <i class="fas fa-heart fa-lg y px-1"></i>
+                  </button>
                 </div>
                 <% if(product.stock==0) {%>
-                  <p class="card-text text-danger mx-2 mt-2"><small>Out of stock</small></p>
+                  <p class="card-text text-danger fw-bold mx-2 mt-2"><small>Out of stock</small></p>
                   <% } else { %>
                   <p class="card-text mx-2 mt-2"><small>Available <%= product.stock %></small></p>
                   <% } %>
@@ -71,7 +71,7 @@
     <% products.forEach(function(product){ %>
       <% if( product.category.categoryName==='mobile') {%>
         <div class="col-lg-3 col-md-6 col-sm-12 d-flex justify-content-center">
-          <div class="card my-2 w-100 shadow-2-strong" style="width: 18rem;" >
+          <div class="card my-2 w-100  shadow-2-strong" style="width: 18rem;" >
             <a href="/product/<%= product._id %>/view" class="text-decoration-none text-dark">
               <img src="<%= product.images[0] %>" style="height: 16rem;" class="card-img-top" alt="product image">
               <div class="card-body d-flex flex-column">
@@ -80,9 +80,10 @@
               </a>
                 <div class="d-flex align-items-end pt-1 px-0 pb-0 mt-auto">
                   <button type="button" onclick="addToCart('<%= product._id %>')" class="btn btn-dark shadow-0 me-1">Add to cart</button>
-                  <a href="" class="btn btn-light border px-2 pt-2 icon-hover">
-                    <i class="fas fa-heart fa-lg text-secondary px-1"></i>
-                  </a>
+                  
+                  <button type="button" onclick="addToWishlist('<%= product._id %>')" class="btn btn-outline-secondary border px-2 pt-2 icon-hover">
+                    <i class="fas fa-heart fa-lg y px-1"></i>
+                  </button>
                 </div>
                 <% if(product.stock==0) {%>
                 <p class="card-text text-danger mx-2 mt-2"><small>Out of stock</small></p>
@@ -164,7 +165,65 @@
   
 </div>
 </section>
+
+<div class="modal fade" tabindex="-1" role="dialog" id="firstModal">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content my-4">
+      <div class="modal-body p-0">
+        <div class="container">
+          <div class="row align-items-center">
+            <div class="col-lg-12 text-center">
+              <div class="p-4">
+                <h1 class="text-dark h4">Subscribe To Our Newsletter</h1>
+                <p class="mt-3 text-secondary"><i class="fas fa-check-circle me-2 text-warning"></i> Receive occasional <strong>vouchers</strong> and <strong>gift coupons</strong> via your email.</p>
+                <form action="" method="post">
+                <div class="mb-3 mt-4">
+                  <input type="email" style="height:48px" class="w-75 form-control rounded-0" placeholder="Enter Your Email Id">
+                </div>
+                <div><button class="px-4 btn btn-dark rounded-pill">Subscribe</button></div>
+                <div class="mt-1"><button type="button" class="btn fw-bold text-secondary" data-bs-dismiss="modal">No thanks! </button></div>
+              </form>
+              </div>
+            </div>
+            <div class="col">
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
+
+window.addEventListener('DOMContentLoaded', () => {
+
+if (!sessionStorage.getItem("modal")) {
+  const modal = new bootstrap.Modal(document.querySelector('#firstModal'));
+  modal.show();
+  sessionStorage.setItem("modal", "blah");
+}
+
+});
+
+async function addToWishlist(productId){
+  try {
+    let responce = await fetch(`/wishlist/${productId}/add`,{
+      method:'PUT',
+      headers:{
+        'Content-Type': 'application/json',
+      }
+    });
+    console.log(responce)
+    if(responce.ok){
+      window.location.reload()
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
 
 async function addToCart(productId){
   try {

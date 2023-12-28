@@ -7,21 +7,21 @@
     <h2 class="mt-4 fw-bold subheading px-5">Users</h2>
     <hr size="4">
 
-    <div class="mx-5 border">
-        <div class="row">
-            <form class="d-flex col-lg-8 col-10 ms-4 my-3">
+    <div class="mx-5">
+        <div class="row mt-3">
+            <!-- <form class="d-flex col-lg-8 col-10 ms-4 my-3">
                 <input class="form-control me-1 py-2" type="search" placeholder="Search" aria-label="Search">
                 <button class="btn btn-dark px-3" type="submit">Search</button>
-            </form>
+            </form> -->
             
-            <table class="table align-middle mx-3 mb-0 bg-white">
+            <table id="userTable" class="table align-middle mt-3 pt-3 mb-0 bg-white">
               <thead class="bg-light">
                 <tr>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Status</th>
-                  <th>Role</th>
-                  <th>Actions</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Phone</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,8 +66,12 @@
 </div>
 </div>
 </div>  
-
-
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script>
+  $(document).ready( function () {
+    $('#userTable').DataTable();
+} );
+</script>
 
 
 <!-- <div class="table-responsive">
@@ -95,3 +99,4 @@
       </tbody>
     </table>
 </div> -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.js"></script>

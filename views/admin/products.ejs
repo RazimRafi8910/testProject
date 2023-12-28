@@ -24,20 +24,40 @@
     <div class="mx-5 border">
         <div class="row">
             <div class="d-flex pt-3 ms-5">
-                <form class="d-flex col-lg-8 col-10" action="/admin/products/search" method="get">
-                    <input class="form-control me-1 py-2" type="search" placeholder="Search" aria-label="Search" name="productName">
+                <form class="d-flex col-lg-8 col-10" action="/admin/products" method="get">
+                  
+                  <% if(productName === '') { %>
+                    <input class="form-control py-2 border border-secondary rounded-0 rounded-start" 
+                    type="search" 
+                    name="productName" 
+                    placeholder="Search" 
+                    aria-label="Search">
+                    <% } else { %>
+                      <input class="form-control py-2 border border-secondary rounded-0 rounded-start" 
+                      type="search" 
+                      name="productName"
+                      value="<%= productName %>" 
+                      placeholder="Search" 
+                      aria-label="Search">
+                      <% } %>
                     <button class="btn btn-dark px-3" type="submit">Search</button>
                 </form>
     
                 <div class="dropdown ms-5 me-5 col-lg-2 col-10 col-md-3">
                     <button class="btn btn-outline-secondary dropdown-toggle px-5" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="true">
-                      Categorys
+                      <% if(filterCategory === 'All') { %>
+                      categorys
+                      <% } else { %>
+                        <% categorys.forEach(function(category){ %>
+                          <% if(filterCategory == category._id ) {%>
+                            <%= category.categoryName %>
+                            <% }})} %>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                      <li><a class="dropdown-item" href="/admin/products?category=">All</a></li>
+                      <li><a class="dropdown-item" href="/admin/products">All</a></li>         
                       <% categorys.forEach(function(category){ %>
-                      <li><a class="dropdown-item" href="/admin/products?category=<%= category.categoryName %>"><%= category.categoryName %></a></li>
-                      <%})%>
+                      <li><a class="dropdown-item" href="/admin/products?category=<%= category._id %>"><%= category.categoryName %></a></li>
+                      <%}) %>
                     </ul>
                 </div>
             </div>
